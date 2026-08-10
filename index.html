@@ -16,7 +16,7 @@
   // 「API Keys」の anon public キーを、下の値に置き換えてください。
   window.SUPABASE_CONFIG = {
     url: "https://oigfydujslbduhgbvqyq.supabase.co",   // 例: https://xxxxxxxxxxxx.supabase.co
-    anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pZ2Z5ZHVqc2xiZHVoZ2J2cXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzMTAwNTAsImV4cCI6MjEwMTg4NjA1MH0.p_U2b1tag8lH-7dlL71Kadwp8hoqrWv2KBohCa8ROKc"
+anonKey:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pZ2Z5ZHVqc2xiZHVoZ2J2cXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzMTAwNTAsImV4cCI6MjEwMTg4NjA1MH0.p_U2b1tag8lH-7dlL71Kadwp8hoqrWv2KBohCa8ROKc"
   };
 </script>
 <!-- ▲▲▲ Supabase設定はここまで ▲▲▲ -->
@@ -279,7 +279,7 @@
       </div>
       <div class="mus-row3">
         <div class="mus-field">
-          <label for="f-qty">数量</label>
+          <label for="f-qty">数量（1人前分）</label>
           <div class="mus-voicerow">
             <input type="number" id="f-qty" inputmode="decimal" placeholder="0" />
             <button type="button" class="mus-mic" data-mic-target="f-qty" data-mic-numeric="1" aria-label="数量を音声入力">${micIconSvg}</button>
@@ -292,7 +292,7 @@
           </select>
         </div>
         <div class="mus-field">
-          <label for="f-capacity">容量</label>
+          <label for="f-capacity">容量（1人前分）</label>
           <div class="mus-voicerow">
             <input type="number" id="f-capacity" inputmode="decimal" placeholder="0" />
             <button type="button" class="mus-mic" data-mic-target="f-capacity" data-mic-numeric="1" aria-label="容量を音声入力">${micIconSvg}</button>
@@ -337,6 +337,10 @@
         <div class="mus-field">
           <label for="s-keyword">メニュー名・材料・仕入先で検索</label>
           <input type="text" id="s-keyword" placeholder="キーワードを入力" />
+        </div>
+        <div class="mus-field">
+          <label for="s-servings">人数（登録値は1人前として計算します）</label>
+          <input type="number" id="s-servings" inputmode="numeric" min="1" step="1" value="1" />
         </div>
         <button class="mus-btn mus-btn-ghost" id="btn-clear-search" style="width:100%;">検索条件をクリア</button>
       </div>
@@ -626,14 +630,26 @@
       return;
     }
 
+    const servingsRaw = parseFloat($("#s-servings").value);
+    const servings = (!isNaN(servingsRaw) && servingsRaw > 0) ? servingsRaw : 1;
+
     body.innerHTML = filtered.map(r => {
       const day = r.date ? r.date.split("-")[2] : "--";
       const monthLabel = r.date ? `${r.date.split("-")[1]}月` : "";
-      const capText = r.capacity ? `${escapeHtml(r.capacity)}` : "";
+      const capNum = parseFloat(r.capacity);
+      const hasCap = !isNaN(capNum);
+      const displayCap = hasCap ? Math.round((capNum * servings) * 1000) / 1000 : r.capacity;
+      const capText = hasCap ? `${escapeHtml(String(displayCap))}` : (r.capacity ? escapeHtml(r.capacity) : "");
+      const capServingsNote = (hasCap && servings !== 1) ? `（1人前 ${escapeHtml(r.capacity)} × ${servings}人分）` : "";
       const qtyNum = parseFloat(r.qty);
       const priceNum = parseFloat(r.price);
-      const subtotalText = (!isNaN(qtyNum) && !isNaN(priceNum))
-        ? `<span class="mus-cap">（小計 ¥${Math.round(qtyNum * priceNum).toLocaleString()}）</span>`
+      const hasQty = !isNaN(qtyNum);
+      const displayQty = hasQty ? Math.round((qtyNum * servings) * 1000) / 1000 : r.qty;
+      const servingsNote = (hasQty && servings !== 1)
+        ? `<span class="mus-cap">（1人前 ${escapeHtml(r.qty)}${escapeHtml(r.unit || "")} × ${servings}人分）</span>`
+        : "";
+      const subtotalText = (hasQty && !isNaN(priceNum))
+        ? `<span class="mus-cap">（小計 ¥${Math.round(qtyNum * servings * priceNum).toLocaleString()}）</span>`
         : "";
       const supplierText = r.supplier ? `<div class="mus-note" style="border-top:none;padding-top:0;">仕入先: ${escapeHtml(r.supplier)}${r.price ? ` ／ 単価 ¥${escapeHtml(r.price)}` : ""}</div>` : "";
       return `
@@ -645,8 +661,9 @@
           </div>
           <div class="mus-material">
             ${escapeHtml(r.material)}
-            <span class="mus-qty">${escapeHtml(r.qty || "")}${escapeHtml(r.unit || "")}</span>
-            ${capText ? `<span class="mus-cap">（容量 ${capText}）</span>` : ""}
+            <span class="mus-qty">${escapeHtml(String(displayQty))}${escapeHtml(r.unit || "")}</span>
+            ${servingsNote}
+            ${capText ? `<span class="mus-cap">（容量 ${capText}${capServingsNote}）</span>` : ""}
             ${subtotalText}
           </div>
           ${supplierText}
@@ -695,7 +712,7 @@
     await deleteRecordDb(id);
   }
 
-  ["s-from", "s-to", "s-keyword"].forEach(id => {
+  ["s-from", "s-to", "s-keyword", "s-servings"].forEach(id => {
     $("#" + id).addEventListener("input", renderList);
   });
   $("#btn-clear-search").addEventListener("click", () => {
@@ -723,7 +740,14 @@
         recognizer.maxAlternatives = 1;
         btn.classList.add("listening");
 
+        const stuckTimer = setTimeout(() => {
+          btn.classList.remove("listening");
+          try { recognizer.abort(); } catch (e) {}
+          showToast("音声を認識できませんでした。端末のキーボードのマイクアイコンでも入力できます。");
+        }, 8000);
+
         recognizer.onresult = (event) => {
+          clearTimeout(stuckTimer);
           let text = event.results[0][0].transcript.trim();
           if (isNumeric) {
             const match = text.match(/[0-9]+(\.[0-9]+)?/);
@@ -735,14 +759,17 @@
           input.dispatchEvent(new Event("input"));
         };
         recognizer.onerror = () => {
+          clearTimeout(stuckTimer);
           showToast("音声を認識できませんでした。もう一度お試しください。");
         };
         recognizer.onend = () => {
+          clearTimeout(stuckTimer);
           btn.classList.remove("listening");
         };
         try {
           recognizer.start();
         } catch (e) {
+          clearTimeout(stuckTimer);
           btn.classList.remove("listening");
         }
       });
