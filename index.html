@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>調理メニュー材料管理システム</title>
+</head>
+<body style="margin:0; background:#F7F3EA;">
+<div id="app-root"></div>
+
+<!-- ▼▼▼ Supabase設定はここに貼り付けてください ▼▼▼ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // Supabaseダッシュボード（https://supabase.com/dashboard）の
+  // 「Project Settings」→「Data API」に表示される Project URL と
+  // 「API Keys」の anon public キーを、下の値に置き換えてください。
+  window.SUPABASE_CONFIG = {
+    url: "ここに入力",   // 例: https://xxxxxxxxxxxx.supabase.co
+    anonKey: "ここに入力"
+  };
+</script>
+<!-- ▲▲▲ Supabase設定はここまで ▲▲▲ -->
+<style>
+  #app-root {
+    --bg: #F7F3EA;
+    --surface: #FFFFFF;
+    --border: #DDD3BC;
+    --text: #2B2A25;
+    --text-muted: #85795F;
+    --accent: #4C6B4F;
+    --accent-dark: #37503A;
+    --accent-tint: #E4EBE1;
+    --danger: #A6432B;
+    --danger-tint: #F5E4DE;
+    --stamp: #AE3A2C;
+    font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Meiryo", sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    padding: 0;
+    max-width: 640px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+  #app-root * { box-sizing: border-box; }
+  .mus-header {
+    padding: 20px 16px 14px;
+    border-bottom: 2px solid var(--text);
+  }
+  .mus-title {
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin: 0;
+  }
+  .mus-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 4px 0 0;
+  }
+  .mus-tabs {
+    display: flex;
+    gap: 0;
+    margin: 16px 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .mus-tab {
+    flex: 1;
+    padding: 10px 8px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+  }
+  .mus-tab.active {
+    color: var(--accent-dark);
+    border-bottom-color: var(--accent);
+  }
+  .mus-panel { padding: 16px; }
+  .mus-panel[hidden] { display: none; }
+
+  .mus-field { margin-bottom: 14px; }
+  .mus-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }
+  .mus-field input, .mus-field select, .mus-field textarea {
+    width: 100%;
+    font-size: 15px;
+    padding: 10px 11px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    -webkit-appearance: none;
+  }
+  .mus-field input:focus, .mus-field select:focus, .mus-field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-tint);
+  }
+  .mus-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mus-row3 { display: grid; grid-template-columns: 1.2fr 0.8fr 1fr; gap: 10px; }
+
+  .mus-voicerow { display: flex; align-items: stretch; gap: 8px; }
+  .mus-voicerow input, .mus-voicerow textarea { flex: 1; }
+  .mus-mic {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--accent);
+    background: var(--accent-tint);
+    color: var(--accent-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .mus-mic svg { width: 18px; height: 18px; }
+  .mus-mic.listening {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+    animation: mus-pulse 1s ease-in-out infinite;
+  }
+  @keyframes mus-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+  .mus-voice-note { font-size: 11px; color: var(--text-muted); margin: -8px 0 14px; }
+  .mus-subtotal { font-size: 12px; color: var(--text-muted); margin: -6px 0 14px; text-align: right; }
+
+  .mus-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 12px 18px;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .mus-btn-primary { background: var(--accent); color: #fff; width: 100%; }
+  .mus-btn-primary:active { background: var(--accent-dark); }
+  .mus-btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+  .mus-btn-danger { background: var(--danger-tint); color: var(--danger); border: 1px solid var(--danger); font-size: 13px; padding: 7px 12px; min-height: 34px; }
+  .mus-btn-small { background: var(--accent-tint); color: var(--accent-dark); border: 1px solid var(--accent); font-size: 13px; padding: 7px 12px; min-height: 34px; }
+  .mus-actionrow { display: flex; gap: 8px; margin-top: 4px; }
+  .mus-actionrow .mus-btn-ghost { flex: 0 0 auto; }
+
+  .mus-searchbox {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  .mus-count { font-size: 12px; color: var(--text-muted); margin: 0 0 10px 2px; }
+
+  .mus-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 14px 12px 58px;
+    margin-bottom: 10px;
+    background-image: repeating-linear-gradient(to right, var(--border) 0 6px, transparent 6px 12px);
+    background-size: 100% 1px;
+    background-position: top 0 left 0;
+    background-repeat: no-repeat;
+  }
+  .mus-stamp {
+    position: absolute;
+    left: 12px;
+    top: 14px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--stamp);
+    color: var(--stamp);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.1;
+    flex-direction: column;
+    transform: rotate(-6deg);
+  }
+  .mus-stamp small { font-size: 8px; font-weight: 700; }
+  .mus-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .mus-menu { font-weight: 700; font-size: 15px; }
+  .mus-date { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .mus-material { font-size: 14px; margin-top: 6px; }
+  .mus-qty { color: var(--accent-dark); font-weight: 700; }
+  .mus-cap { color: var(--text-muted); font-size: 12px; }
+  .mus-note { font-size: 12px; color: var(--text-muted); margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 6px; }
+
+  .mus-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 40px 10px; }
+  .mus-loading { text-align: center; color: var(--text-muted); font-size: 13px; padding: 30px 10px; }
+  .mus-toast {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--accent-dark); color: #fff; font-size: 13px;
+    text-align: center; padding: 8px; border-radius: 6px; margin: 0 16px 10px;
+  }
+  .mus-toast[hidden] { display: none; }
+
+  @media (min-width: 560px) {
+    .mus-panel { padding: 20px 24px; }
+    .mus-header { padding: 24px 24px 16px; }
+    .mus-tabs { margin: 20px 24px 0; }
+  }
+</style>
+<script>
+(function() {
+  const UNITS = ["g", "kg", "ml", "L", "個", "本", "枚", "パック", "その他"];
+  let records = [];
+  let editingId = null;
+  let loaded = false;
+
+  const micIconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+
+  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const voiceSupported = !!SpeechRecognitionCtor;
+
+  const root = document.getElementById("app-root");
+  root.innerHTML = `
+    <div class="mus-header">
+      <p class="mus-title">調理メニュー材料管理システム</p>
+      <p class="mus-sub">材料の使用内容を登録・検索します（全端末で共有）</p>
+    </div>
+    <div class="mus-tabs">
+      <button class="mus-tab active" data-tab="register">登録</button>
+      <button class="mus-tab" data-tab="list">一覧・検索</button>
+    </div>
+    <div class="mus-toast" id="toast" hidden></div>
+
+    <section class="mus-panel" id="panel-register">
+      <div class="mus-field">
+        <label for="f-date">作成日</label>
+        <input type="date" id="f-date" />
+      </div>
+      <p class="mus-voice-note" id="voice-support-note" hidden>この端末のブラウザは音声入力に対応していません。テキスト入力をご利用ください。</p>
+      <div class="mus-field">
+        <label for="f-menu">メニュー名</label>
+        <div class="mus-voicerow">
+          <input type="text" id="f-menu" list="menu-list" placeholder="例：肉じゃが" />
+          <button type="button" class="mus-mic" data-mic-target="f-menu" aria-label="メニュー名を音声入力">${micIconSvg}</button>
+        </div>
+        <datalist id="menu-list"></datalist>
+      </div>
+      <div class="mus-field">
+        <label for="f-material">材料</label>
+        <div class="mus-voicerow">
+          <input type="text" id="f-material" placeholder="例：じゃがいも" />
+          <button type="button" class="mus-mic" data-mic-target="f-material" aria-label="材料を音声入力">${micIconSvg}</button>
+        </div>
+      </div>
+      <div class="mus-field">
+        <label for="f-supplier">仕入先</label>
+        <div class="mus-voicerow">
+          <input type="text" id="f-supplier" list="supplier-list" placeholder="例：〇〇青果店" />
+          <button type="button" class="mus-mic" data-mic-target="f-supplier" aria-label="仕入先を音声入力">${micIconSvg}</button>
+        </div>
+        <datalist id="supplier-list"></datalist>
+      </div>
+      <div class="mus-row3">
+        <div class="mus-field">
+          <label for="f-qty">数量</label>
+          <div class="mus-voicerow">
+            <input type="number" id="f-qty" inputmode="decimal" placeholder="0" />
+            <button type="button" class="mus-mic" data-mic-target="f-qty" data-mic-numeric="1" aria-label="数量を音声入力">${micIconSvg}</button>
+          </div>
+        </div>
+        <div class="mus-field">
+          <label for="f-unit">単位</label>
+          <select id="f-unit">
+            ${UNITS.map(u => `<option value="${u}">${u}</option>`).join("")}
+          </select>
+        </div>
+        <div class="mus-field">
+          <label for="f-capacity">容量</label>
+          <div class="mus-voicerow">
+            <input type="number" id="f-capacity" inputmode="decimal" placeholder="0" />
+            <button type="button" class="mus-mic" data-mic-target="f-capacity" data-mic-numeric="1" aria-label="容量を音声入力">${micIconSvg}</button>
+          </div>
+        </div>
+      </div>
+      <div class="mus-field">
+        <label for="f-price">購入時単価（円）</label>
+        <div class="mus-voicerow">
+          <input type="number" id="f-price" inputmode="decimal" placeholder="0" />
+          <button type="button" class="mus-mic" data-mic-target="f-price" data-mic-numeric="1" aria-label="単価を音声入力">${micIconSvg}</button>
+        </div>
+      </div>
+      <p class="mus-subtotal" id="subtotal-display"></p>
+      <div class="mus-field">
+        <label for="f-note">備考</label>
+        <div class="mus-voicerow">
+          <textarea id="f-note" rows="2" placeholder="下処理内容・代替材料など"></textarea>
+          <button type="button" class="mus-mic" data-mic-target="f-note" aria-label="備考を音声入力">${micIconSvg}</button>
+        </div>
+      </div>
+      <div class="mus-actionrow">
+        <button class="mus-btn mus-btn-primary" id="btn-save">登録する</button>
+      </div>
+      <div class="mus-actionrow" id="cancel-row" style="display:none;">
+        <button class="mus-btn mus-btn-ghost" id="btn-cancel-edit">編集をやめる</button>
+      </div>
+    </section>
+
+    <section class="mus-panel" id="panel-list" hidden>
+      <div class="mus-searchbox">
+        <div class="mus-row2">
+          <div class="mus-field">
+            <label for="s-from">期間（開始）</label>
+            <input type="date" id="s-from" />
+          </div>
+          <div class="mus-field">
+            <label for="s-to">期間（終了）</label>
+            <input type="date" id="s-to" />
+          </div>
+        </div>
+        <div class="mus-field">
+          <label for="s-keyword">メニュー名・材料・仕入先で検索</label>
+          <input type="text" id="s-keyword" placeholder="キーワードを入力" />
+        </div>
+        <button class="mus-btn mus-btn-ghost" id="btn-clear-search" style="width:100%;">検索条件をクリア</button>
+      </div>
+      <p class="mus-count" id="result-count"></p>
+      <div id="list-body"></div>
+    </section>
+  `;
+
+  const $ = (sel) => root.querySelector(sel);
+  const tabs = root.querySelectorAll(".mus-tab");
+  const panelRegister = $("#panel-register");
+  const panelList = $("#panel-list");
+
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const target = tab.dataset.tab;
+      panelRegister.hidden = target !== "register";
+      panelList.hidden = target !== "list";
+      if (target === "list") renderList();
+    });
+  });
+
+  function showToast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.hidden = false;
+    setTimeout(() => { t.hidden = true; }, 2200);
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  }
+
+  function resetForm() {
+    $("#f-date").value = todayStr();
+    $("#f-menu").value = "";
+    $("#f-material").value = "";
+    $("#f-supplier").value = "";
+    $("#f-qty").value = "";
+    $("#f-unit").value = UNITS[0];
+    $("#f-capacity").value = "";
+    $("#f-price").value = "";
+    $("#f-note").value = "";
+    editingId = null;
+    $("#btn-save").textContent = "登録する";
+    $("#cancel-row").style.display = "none";
+    updateSubtotalDisplay();
+  }
+
+  function updateSubtotalDisplay() {
+    const qty = parseFloat($("#f-qty").value);
+    const price = parseFloat($("#f-price").value);
+    const el = $("#subtotal-display");
+    if (!isNaN(qty) && !isNaN(price)) {
+      el.textContent = `小計: ¥${Math.round(qty * price).toLocaleString()}`;
+    } else {
+      el.textContent = "";
+    }
+  }
+
+  const TABLE = "menu_usage_records";
+  let sb = null;
+  let supabaseReady = false;
+
+  function initSupabase() {
+    const cfg = window.SUPABASE_CONFIG || {};
+    if (!cfg.url || cfg.url === "ここに入力" || !cfg.anonKey || cfg.anonKey === "ここに入力") {
+      showSetupNotice();
+      return false;
+    }
+    try {
+      sb = supabase.createClient(cfg.url, cfg.anonKey);
+      supabaseReady = true;
+      return true;
+    } catch (e) {
+      showSetupNotice();
+      return false;
+    }
+  }
+
+  function showSetupNotice() {
+    const body = $("#list-body");
+    if (body) {
+      body.innerHTML = `<div class="mus-empty">Supabaseの設定が完了していません。<br>index.html の SUPABASE_CONFIG に、SupabaseのProject URLとanonキーを貼り付けてください。</div>`;
+    }
+    showToast("Supabaseの設定を確認してください");
+  }
+
+  function rowToRecord(row) {
+    return {
+      id: row.id,
+      date: row.created_date,
+      menu: row.menu_name,
+      material: row.material,
+      supplier: row.supplier,
+      qty: row.quantity,
+      unit: row.unit,
+      capacity: row.capacity,
+      price: row.unit_price,
+      note: row.note
+    };
+  }
+
+  function recordToRow(rec) {
+    return {
+      created_date: rec.date || null,
+      menu_name: rec.menu || null,
+      material: rec.material || null,
+      supplier: rec.supplier || null,
+      quantity: rec.qty === "" ? null : rec.qty,
+      unit: rec.unit || null,
+      capacity: rec.capacity === "" ? null : rec.capacity,
+      unit_price: rec.price === "" ? null : rec.price,
+      note: rec.note || null
+    };
+  }
+
+  async function fetchRecords() {
+    if (!supabaseReady) return;
+    const { data, error } = await sb.from(TABLE).select("*").order("created_date", { ascending: false });
+    loaded = true;
+    if (error) {
+      showToast("データの取得に失敗しました。Supabaseの設定やテーブル構成をご確認ください。");
+      renderList();
+      return;
+    }
+    records = (data || []).map(rowToRecord);
+    updateMenuDatalist();
+    renderList();
+  }
+
+  function subscribeRealtime() {
+    if (!supabaseReady) return;
+    sb.channel("menu_usage_records_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, () => {
+        fetchRecords();
+      })
+      .subscribe();
+  }
+
+  async function insertRecordDb(rec) {
+    if (!supabaseReady) { showSetupNotice(); return; }
+    const { error } = await sb.from(TABLE).insert({ id: rec.id, ...recordToRow(rec) });
+    if (error) {
+      showToast("登録に失敗しました: " + error.message);
+    } else {
+      showToast("登録しました");
+    }
+  }
+
+  async function updateRecordDb(id, rec) {
+    if (!supabaseReady) { showSetupNotice(); return; }
+    const { error } = await sb.from(TABLE).update(recordToRow(rec)).eq("id", id);
+    if (error) {
+      showToast("更新に失敗しました: " + error.message);
+    } else {
+      showToast("更新しました");
+    }
+  }
+
+  async function deleteRecordDb(id) {
+    if (!supabaseReady) { showSetupNotice(); return; }
+    const { error } = await sb.from(TABLE).delete().eq("id", id);
+    if (error) {
+      showToast("削除に失敗しました: " + error.message);
+    } else {
+      showToast("削除しました");
+    }
+  }
+
+  function updateMenuDatalist() {
+    const names = [...new Set(records.map(r => r.menu).filter(Boolean))];
+    $("#menu-list").innerHTML = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join("");
+    const suppliers = [...new Set(records.map(r => r.supplier).filter(Boolean))];
+    $("#supplier-list").innerHTML = suppliers.map(n => `<option value="${escapeHtml(n)}"></option>`).join("");
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return `${y}/${m}/${d}`;
+  }
+
+  $("#btn-save").addEventListener("click", async () => {
+    const date = $("#f-date").value;
+    const menu = $("#f-menu").value.trim();
+    const material = $("#f-material").value.trim();
+    const supplier = $("#f-supplier").value.trim();
+    const qty = $("#f-qty").value;
+    const unit = $("#f-unit").value;
+    const capacity = $("#f-capacity").value;
+    const price = $("#f-price").value;
+    const note = $("#f-note").value.trim();
+
+    if (!date || !material) {
+      showToast("作成日と材料は必須です");
+      return;
+    }
+
+    const payload = { date, menu, material, supplier, qty, unit, capacity, price, note };
+
+    if (editingId) {
+      await updateRecordDb(editingId, payload);
+    } else {
+      payload.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      await insertRecordDb(payload);
+    }
+    resetForm();
+  });
+
+  $("#btn-cancel-edit").addEventListener("click", resetForm);
+
+  ["f-qty", "f-price"].forEach(id => {
+    $("#" + id).addEventListener("input", updateSubtotalDisplay);
+  });
+
+  function matchesFilter(r) {
+    const from = $("#s-from").value;
+    const to = $("#s-to").value;
+    const kw = $("#s-keyword").value.trim().toLowerCase();
+    if (from && r.date < from) return false;
+    if (to && r.date > to) return false;
+    if (kw) {
+      const hay = `${r.menu || ""} ${r.material || ""} ${r.supplier || ""}`.toLowerCase();
+      if (!hay.includes(kw)) return false;
+    }
+    return true;
+  }
+
+  function renderList() {
+    const body = $("#list-body");
+    const countEl = $("#result-count");
+    if (!loaded) {
+      body.innerHTML = `<div class="mus-loading">読み込み中...</div>`;
+      countEl.textContent = "";
+      return;
+    }
+    const filtered = records
+      .filter(matchesFilter)
+      .sort((a, b) => (b.date || "").localeCompare(a.date || "") || (a.menu || "").localeCompare(b.menu || ""));
+
+    countEl.textContent = `${filtered.length} 件`;
+
+    if (filtered.length === 0) {
+      body.innerHTML = `<div class="mus-empty">条件に一致するデータがありません。<br>登録タブから新しい実績を登録できます。</div>`;
+      return;
+    }
+
+    body.innerHTML = filtered.map(r => {
+      const day = r.date ? r.date.split("-")[2] : "--";
+      const monthLabel = r.date ? `${r.date.split("-")[1]}月` : "";
+      const capText = r.capacity ? `${escapeHtml(r.capacity)}` : "";
+      const qtyNum = parseFloat(r.qty);
+      const priceNum = parseFloat(r.price);
+      const subtotalText = (!isNaN(qtyNum) && !isNaN(priceNum))
+        ? `<span class="mus-cap">（小計 ¥${Math.round(qtyNum * priceNum).toLocaleString()}）</span>`
+        : "";
+      const supplierText = r.supplier ? `<div class="mus-note" style="border-top:none;padding-top:0;">仕入先: ${escapeHtml(r.supplier)}${r.price ? ` ／ 単価 ¥${escapeHtml(r.price)}` : ""}</div>` : "";
+      return `
+        <div class="mus-card" data-id="${r.id}">
+          <div class="mus-stamp"><small>${monthLabel}</small>${day}</div>
+          <div class="mus-card-head">
+            <span class="mus-menu">${escapeHtml(r.menu || "（メニュー未設定）")}</span>
+            <span class="mus-date">${fmtDate(r.date)}</span>
+          </div>
+          <div class="mus-material">
+            ${escapeHtml(r.material)}
+            <span class="mus-qty">${escapeHtml(r.qty || "")}${escapeHtml(r.unit || "")}</span>
+            ${capText ? `<span class="mus-cap">（容量 ${capText}）</span>` : ""}
+            ${subtotalText}
+          </div>
+          ${supplierText}
+          ${r.note ? `<div class="mus-note">${escapeHtml(r.note)}</div>` : ""}
+          <div class="mus-actionrow">
+            <button class="mus-btn mus-btn-small" data-action="edit" data-id="${r.id}">編集</button>
+            <button class="mus-btn mus-btn-danger" data-action="delete" data-id="${r.id}">削除</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    body.querySelectorAll("[data-action='edit']").forEach(btn => {
+      btn.addEventListener("click", () => startEdit(btn.dataset.id));
+    });
+    body.querySelectorAll("[data-action='delete']").forEach(btn => {
+      btn.addEventListener("click", () => deleteRecord(btn.dataset.id));
+    });
+  }
+
+  function startEdit(id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    editingId = id;
+    $("#f-date").value = r.date || todayStr();
+    $("#f-menu").value = r.menu || "";
+    $("#f-material").value = r.material || "";
+    $("#f-supplier").value = r.supplier || "";
+    $("#f-qty").value = r.qty || "";
+    $("#f-unit").value = r.unit || UNITS[0];
+    $("#f-capacity").value = r.capacity || "";
+    $("#f-price").value = r.price || "";
+    $("#f-note").value = r.note || "";
+    $("#btn-save").textContent = "更新する";
+    $("#cancel-row").style.display = "flex";
+    updateSubtotalDisplay();
+
+    tabs.forEach(t => t.classList.remove("active"));
+    root.querySelector('[data-tab="register"]').classList.add("active");
+    panelRegister.hidden = false;
+    panelList.hidden = true;
+    root.scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function deleteRecord(id) {
+    await deleteRecordDb(id);
+  }
+
+  ["s-from", "s-to", "s-keyword"].forEach(id => {
+    $("#" + id).addEventListener("input", renderList);
+  });
+  $("#btn-clear-search").addEventListener("click", () => {
+    $("#s-from").value = "";
+    $("#s-to").value = "";
+    $("#s-keyword").value = "";
+    renderList();
+  });
+
+  function wireMicButtons() {
+    const micButtons = root.querySelectorAll(".mus-mic");
+    if (!voiceSupported) {
+      micButtons.forEach(btn => { btn.style.display = "none"; });
+      $("#voice-support-note").hidden = false;
+      return;
+    }
+    micButtons.forEach(btn => {
+      const targetId = btn.dataset.micTarget;
+      const isNumeric = btn.dataset.micNumeric === "1";
+      btn.addEventListener("click", () => {
+        if (btn.classList.contains("listening")) return;
+        const recognizer = new SpeechRecognitionCtor();
+        recognizer.lang = "ja-JP";
+        recognizer.interimResults = false;
+        recognizer.maxAlternatives = 1;
+        btn.classList.add("listening");
+
+        recognizer.onresult = (event) => {
+          let text = event.results[0][0].transcript.trim();
+          if (isNumeric) {
+            const match = text.match(/[0-9]+(\.[0-9]+)?/);
+            text = match ? match[0] : "";
+          }
+          const input = $("#" + targetId);
+          if (!input) return;
+          input.value = text;
+          input.dispatchEvent(new Event("input"));
+        };
+        recognizer.onerror = () => {
+          showToast("音声を認識できませんでした。もう一度お試しください。");
+        };
+        recognizer.onend = () => {
+          btn.classList.remove("listening");
+        };
+        try {
+          recognizer.start();
+        } catch (e) {
+          btn.classList.remove("listening");
+        }
+      });
+    });
+  }
+
+  wireMicButtons();
+  resetForm();
+  if (initSupabase()) {
+    fetchRecords();
+    subscribeRealtime();
+  }
+})();
+</script>
+</body>
+</html>
