@@ -15,8 +15,8 @@
   // 「Project Settings」→「Data API」に表示される Project URL と
   // 「API Keys」の anon public キーを、下の値に置き換えてください。
   window.SUPABASE_CONFIG = {
-    url: "https://oigfydujslbduhgbvqyq.supabase.co",   
-    anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pZ2Z5ZHVqc2xiZHVoZ2J2cXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzMTAwNTAsImV4cCI6MjEwMTg4NjA1MH0.p_U2b1tag8lH-7dlL71Kadwp8hoqrWv2KBohCa8ROKc"
+    url: "ここに入力",   // 例: https://xxxxxxxxxxxx.supabase.co
+    anonKey: "ここに入力"
   };
 </script>
 <!-- ▲▲▲ Supabase設定はここまで ▲▲▲ -->
@@ -340,6 +340,9 @@
         </div>
         <button class="mus-btn mus-btn-ghost" id="btn-clear-search" style="width:100%;">検索条件をクリア</button>
       </div>
+      <div class="mus-actionrow" style="margin-bottom:10px;">
+        <button class="mus-btn mus-btn-small" id="btn-refresh">最新の状態に更新</button>
+      </div>
       <p class="mus-count" id="result-count"></p>
       <div id="list-body"></div>
     </section>
@@ -411,7 +414,11 @@
       return false;
     }
     try {
-      sb = supabase.createClient(cfg.url, cfg.anonKey);
+      sb = supabase.createClient(cfg.url, cfg.anonKey, {
+        global: {
+          fetch: (input, init) => fetch(input, { ...init, cache: "no-store" })
+        }
+      });
       supabaseReady = true;
       return true;
     } catch (e) {
@@ -477,7 +484,18 @@
       .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, () => {
         fetchRecords();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          // リアルタイム更新が使えない環境でも、定期ポーリング(startPolling)が
+          // 他端末の変更を拾うのでここでは何もしない（エラー表示もしない）。
+        }
+      });
+  }
+
+  function startPolling() {
+    setInterval(() => {
+      if (supabaseReady) fetchRecords();
+    }, 15000);
   }
 
   async function insertRecordDb(rec) {
@@ -487,6 +505,11 @@
       showToast("登録に失敗しました: " + error.message);
     } else {
       showToast("登録しました");
+      records.unshift({ ...rec });
+      loaded = true;
+      updateMenuDatalist();
+      renderList();
+      fetchRecords();
     }
   }
 
@@ -497,6 +520,11 @@
       showToast("更新に失敗しました: " + error.message);
     } else {
       showToast("更新しました");
+      const idx = records.findIndex(r => r.id === id);
+      if (idx !== -1) records[idx] = { ...rec, id };
+      updateMenuDatalist();
+      renderList();
+      fetchRecords();
     }
   }
 
@@ -507,6 +535,10 @@
       showToast("削除に失敗しました: " + error.message);
     } else {
       showToast("削除しました");
+      records = records.filter(r => r.id !== id);
+      updateMenuDatalist();
+      renderList();
+      fetchRecords();
     }
   }
 
@@ -722,6 +754,7 @@
   if (initSupabase()) {
     fetchRecords();
     subscribeRealtime();
+    startPolling();
   }
 })();
 </script>
