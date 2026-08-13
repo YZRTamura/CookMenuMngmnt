@@ -16,7 +16,7 @@
   // 「API Keys」の anon public キーを、下の値に置き換えてください。
   window.SUPABASE_CONFIG = {
     url: "https://oigfydujslbduhgbvqyq.supabase.co",   // 例: https://xxxxxxxxxxxx.supabase.co
-anonKey:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pZ2Z5ZHVqc2xiZHVoZ2J2cXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzMTAwNTAsImV4cCI6MjEwMTg4NjA1MH0.p_U2b1tag8lH-7dlL71Kadwp8hoqrWv2KBohCa8ROKc"
+    anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pZ2Z5ZHVqc2xiZHVoZ2J2cXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzMTAwNTAsImV4cCI6MjEwMTg4NjA1MH0.p_U2b1tag8lH-7dlL71Kadwp8hoqrWv2KBohCa8ROKc"
   };
 </script>
 <!-- ▲▲▲ Supabase設定はここまで ▲▲▲ -->
@@ -208,6 +208,8 @@ anonKey:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
   .mus-qty { color: var(--accent-dark); font-weight: 700; }
   .mus-cap { color: var(--text-muted); font-size: 12px; }
   .mus-note { font-size: 12px; color: var(--text-muted); margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 6px; }
+  .mus-item-row { border-top: 1px dashed var(--border); padding-top: 10px; margin-top: 10px; }
+  .mus-item-row:first-of-type { border-top: none; padding-top: 6px; margin-top: 2px; }
 
   .mus-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 40px 10px; }
   .mus-loading { text-align: center; color: var(--text-muted); font-size: 13px; padding: 30px 10px; }
@@ -633,45 +635,66 @@ anonKey:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
     const servingsRaw = parseFloat($("#s-servings").value);
     const servings = (!isNaN(servingsRaw) && servingsRaw > 0) ? servingsRaw : 1;
 
-    body.innerHTML = filtered.map(r => {
-      const day = r.date ? r.date.split("-")[2] : "--";
-      const monthLabel = r.date ? `${r.date.split("-")[1]}月` : "";
-      const capNum = parseFloat(r.capacity);
-      const hasCap = !isNaN(capNum);
-      const displayCap = hasCap ? Math.round((capNum * servings) * 1000) / 1000 : r.capacity;
-      const capText = hasCap ? `${escapeHtml(String(displayCap))}` : (r.capacity ? escapeHtml(r.capacity) : "");
-      const capServingsNote = (hasCap && servings !== 1) ? `（1人前 ${escapeHtml(r.capacity)} × ${servings}人分）` : "";
-      const qtyNum = parseFloat(r.qty);
-      const priceNum = parseFloat(r.price);
-      const hasQty = !isNaN(qtyNum);
-      const displayQty = hasQty ? Math.round((qtyNum * servings) * 1000) / 1000 : r.qty;
-      const servingsNote = (hasQty && servings !== 1)
-        ? `<span class="mus-cap">（1人前 ${escapeHtml(r.qty)}${escapeHtml(r.unit || "")} × ${servings}人分）</span>`
-        : "";
-      const subtotalText = (hasQty && !isNaN(priceNum))
-        ? `<span class="mus-cap">（小計 ¥${Math.round(qtyNum * servings * priceNum).toLocaleString()}）</span>`
-        : "";
-      const supplierText = r.supplier ? `<div class="mus-note" style="border-top:none;padding-top:0;">仕入先: ${escapeHtml(r.supplier)}${r.price ? ` ／ 単価 ¥${escapeHtml(r.price)}` : ""}</div>` : "";
+    // 作成日 + メニュー名でグループ化（filteredは既に date desc → menu asc でソート済みなので連続する）
+    const groups = [];
+    filtered.forEach(r => {
+      const last = groups[groups.length - 1];
+      if (last && last.date === (r.date || "") && last.menu === (r.menu || "")) {
+        last.items.push(r);
+      } else {
+        groups.push({ date: r.date || "", menu: r.menu || "", items: [r] });
+      }
+    });
+
+    body.innerHTML = groups.map(g => {
+      const first = g.items[0];
+      const day = g.date ? g.date.split("-")[2] : "--";
+      const monthLabel = g.date ? `${g.date.split("-")[1]}月` : "";
+
+      const itemsHtml = g.items.map(r => {
+        const capNum = parseFloat(r.capacity);
+        const hasCap = !isNaN(capNum);
+        const displayCap = hasCap ? Math.round((capNum * servings) * 1000) / 1000 : r.capacity;
+        const capText = hasCap ? `${escapeHtml(String(displayCap))}` : (r.capacity ? escapeHtml(r.capacity) : "");
+        const capServingsNote = (hasCap && servings !== 1) ? `（1人前 ${escapeHtml(r.capacity)} × ${servings}人分）` : "";
+        const qtyNum = parseFloat(r.qty);
+        const priceNum = parseFloat(r.price);
+        const hasQty = !isNaN(qtyNum);
+        const displayQty = hasQty ? Math.round((qtyNum * servings) * 1000) / 1000 : r.qty;
+        const servingsNote = (hasQty && servings !== 1)
+          ? `<span class="mus-cap">（1人前 ${escapeHtml(r.qty)}${escapeHtml(r.unit || "")} × ${servings}人分）</span>`
+          : "";
+        const subtotalText = (hasQty && !isNaN(priceNum))
+          ? `<span class="mus-cap">（小計 ¥${Math.round(qtyNum * servings * priceNum).toLocaleString()}）</span>`
+          : "";
+        const supplierText = r.supplier ? `<div class="mus-note" style="border-top:none;padding-top:0;">仕入先: ${escapeHtml(r.supplier)}${r.price ? ` ／ 単価 ¥${escapeHtml(r.price)}` : ""}</div>` : "";
+        return `
+          <div class="mus-item-row" data-id="${r.id}">
+            <div class="mus-material">
+              ${escapeHtml(r.material)}
+              <span class="mus-qty">${escapeHtml(String(displayQty))}${escapeHtml(r.unit || "")}</span>
+              ${servingsNote}
+              ${capText ? `<span class="mus-cap">（容量 ${capText}${capServingsNote}）</span>` : ""}
+              ${subtotalText}
+            </div>
+            ${supplierText}
+            ${r.note ? `<div class="mus-note">${escapeHtml(r.note)}</div>` : ""}
+            <div class="mus-actionrow">
+              <button class="mus-btn mus-btn-small" data-action="edit" data-id="${r.id}">編集</button>
+              <button class="mus-btn mus-btn-danger" data-action="delete" data-id="${r.id}">削除</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
       return `
-        <div class="mus-card" data-id="${r.id}">
+        <div class="mus-card" data-group="1">
           <div class="mus-stamp"><small>${monthLabel}</small>${day}</div>
           <div class="mus-card-head">
-            <span class="mus-menu">${escapeHtml(r.menu || "（メニュー未設定）")}</span>
-            <span class="mus-date">${fmtDate(r.date)}</span>
+            <span class="mus-menu">${escapeHtml(g.menu || "（メニュー未設定）")}</span>
+            <span class="mus-date">${fmtDate(g.date)}</span>
           </div>
-          <div class="mus-material">
-            ${escapeHtml(r.material)}
-            <span class="mus-qty">${escapeHtml(String(displayQty))}${escapeHtml(r.unit || "")}</span>
-            ${servingsNote}
-            ${capText ? `<span class="mus-cap">（容量 ${capText}${capServingsNote}）</span>` : ""}
-            ${subtotalText}
-          </div>
-          ${supplierText}
-          ${r.note ? `<div class="mus-note">${escapeHtml(r.note)}</div>` : ""}
-          <div class="mus-actionrow">
-            <button class="mus-btn mus-btn-small" data-action="edit" data-id="${r.id}">編集</button>
-            <button class="mus-btn mus-btn-danger" data-action="delete" data-id="${r.id}">削除</button>
-          </div>
+          ${itemsHtml}
         </div>
       `;
     }).join("");
