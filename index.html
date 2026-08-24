@@ -15,8 +15,8 @@
   // 「Project Settings」→「Data API」に表示される Project URL と
   // 「API Keys」の anon public キーを、下の値に置き換えてください。
   window.SUPABASE_CONFIG = {
-    url: "https://oigfydujslbduhgbvqyq.supabase.co",   // 例: https://xxxxxxxxxxxx.supabase.co
-    anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pZ2Z5ZHVqc2xiZHVoZ2J2cXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzMTAwNTAsImV4cCI6MjEwMTg4NjA1MH0.p_U2b1tag8lH-7dlL71Kadwp8hoqrWv2KBohCa8ROKc"
+    url: "ここに入力",   // 例: https://xxxxxxxxxxxx.supabase.co
+    anonKey: "ここに入力"
   };
 </script>
 <!-- ▲▲▲ Supabase設定はここまで ▲▲▲ -->
@@ -140,6 +140,67 @@
   .mus-voice-note { font-size: 11px; color: var(--text-muted); margin: -8px 0 14px; }
   .mus-subtotal { font-size: 12px; color: var(--text-muted); margin: -6px 0 14px; text-align: right; }
 
+  .mus-login-wrap {
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  .mus-login-box {
+    width: 100%;
+    max-width: 340px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 22px;
+  }
+  .mus-login-title {
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    margin: 0 0 20px;
+  }
+  .mus-login-error {
+    font-size: 13px;
+    color: var(--danger);
+    text-align: center;
+    margin: -6px 0 14px;
+    min-height: 16px;
+  }
+  .mus-userbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--accent-tint);
+  }
+  .mus-userbar button {
+    background: none;
+    border: none;
+    color: var(--accent-dark);
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 6px;
+  }
+  .mus-logtable { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mus-logtable th, .mus-logtable td {
+    text-align: left;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .mus-logtable th { color: var(--text-muted); font-weight: 700; white-space: nowrap; }
+  .mus-log-action { font-weight: 700; }
+  .mus-log-action.a-insert { color: var(--accent-dark); }
+  .mus-log-action.a-update { color: #8A6A2A; }
+  .mus-log-action.a-delete { color: var(--danger); }
+
   .mus-btn {
     display: inline-flex;
     align-items: center;
@@ -240,20 +301,42 @@
 
   const root = document.getElementById("app-root");
   root.innerHTML = `
-    <div class="mus-header">
-      <p class="mus-title">調理メニュー材料管理システム</p>
-      <p class="mus-sub">材料の使用内容を登録・検索します（全端末で共有）</p>
+    <div id="login-screen" class="mus-login-wrap">
+      <div class="mus-login-box">
+        <p class="mus-login-title">ログイン</p>
+        <div class="mus-field">
+          <label for="login-id">ログインID</label>
+          <input type="text" id="login-id" autocomplete="username" />
+        </div>
+        <div class="mus-field">
+          <label for="login-pw">パスワード</label>
+          <input type="password" id="login-pw" autocomplete="current-password" />
+        </div>
+        <p class="mus-login-error" id="login-error"></p>
+        <button class="mus-btn mus-btn-primary" id="btn-login">ログイン</button>
+      </div>
     </div>
-    <div class="mus-tabs">
-      <button class="mus-tab active" data-tab="register">登録</button>
-      <button class="mus-tab" data-tab="list">一覧・検索</button>
-    </div>
-    <div class="mus-toast" id="toast" hidden></div>
 
-    <section class="mus-panel" id="panel-register">
-      <div class="mus-field">
-        <label for="f-date">作成日</label>
-        <input type="date" id="f-date" />
+    <div id="main-app" hidden>
+      <div class="mus-userbar">
+        <span id="userbar-label"></span>
+        <button id="btn-logout" type="button">ログアウト</button>
+      </div>
+      <div class="mus-header">
+        <p class="mus-title">調理メニュー材料管理システム</p>
+        <p class="mus-sub">材料の使用内容を登録・検索します（全端末で共有）</p>
+      </div>
+      <div class="mus-tabs">
+        <button class="mus-tab active" data-tab="register">登録</button>
+        <button class="mus-tab" data-tab="list">一覧・検索</button>
+        <button class="mus-tab" data-tab="logs" id="tab-logs" hidden>操作ログ</button>
+      </div>
+      <div class="mus-toast" id="toast" hidden></div>
+
+      <section class="mus-panel" id="panel-register">
+        <div class="mus-field">
+          <label for="f-date">作成日</label>
+          <input type="date" id="f-date" />
       </div>
       <p class="mus-voice-note" id="voice-support-note" hidden>この端末のブラウザは音声入力に対応していません。テキスト入力をご利用ください。</p>
       <div class="mus-field">
@@ -352,12 +435,19 @@
       <p class="mus-count" id="result-count"></p>
       <div id="list-body"></div>
     </section>
+
+    <section class="mus-panel" id="panel-logs" hidden>
+      <p class="mus-count" id="logs-count"></p>
+      <div id="logs-body"></div>
+    </section>
+    </div>
   `;
 
   const $ = (sel) => root.querySelector(sel);
   const tabs = root.querySelectorAll(".mus-tab");
   const panelRegister = $("#panel-register");
   const panelList = $("#panel-list");
+  const panelLogs = $("#panel-logs");
 
   tabs.forEach(tab => {
     tab.addEventListener("click", () => {
@@ -366,7 +456,9 @@
       const target = tab.dataset.tab;
       panelRegister.hidden = target !== "register";
       panelList.hidden = target !== "list";
+      panelLogs.hidden = target !== "logs";
       if (target === "list") renderList();
+      if (target === "logs") loadOperationLogs();
     });
   });
 
@@ -441,6 +533,122 @@
     showToast("Supabaseの設定を確認してください");
   }
 
+  // ---- ログイン状態 ----
+  let currentUser = null; // { id, username, role, loginId, password }
+
+  function showLoginScreen() {
+    $("#login-screen").style.display = "flex";
+    $("#main-app").hidden = true;
+  }
+
+  function showMainApp() {
+    $("#login-screen").style.display = "none";
+    $("#main-app").hidden = false;
+    $("#userbar-label").textContent = `${currentUser.username}さん（${currentUser.role === "admin" ? "管理者" : "一般"}）としてログイン中`;
+    $("#tab-logs").hidden = currentUser.role !== "admin";
+  }
+
+  async function handleLogin() {
+    const loginId = $("#login-id").value.trim();
+    const password = $("#login-pw").value;
+    const errEl = $("#login-error");
+    errEl.textContent = "";
+
+    if (!supabaseReady) {
+      errEl.textContent = "Supabaseの設定が完了していません。";
+      return;
+    }
+    if (!loginId || !password) {
+      errEl.textContent = "ログインIDとパスワードを入力してください。";
+      return;
+    }
+
+    const { data, error } = await sb.rpc("login_check", { p_login_id: loginId, p_password: password });
+    if (error) {
+      errEl.textContent = "ログイン確認中にエラーが発生しました。";
+      return;
+    }
+    if (!data || data.length === 0) {
+      errEl.textContent = "ログインIDまたはパスワードが正しくありません。";
+      return;
+    }
+
+    const u = data[0];
+    currentUser = { id: u.id, username: u.username, role: u.role, loginId, password };
+    $("#login-pw").value = "";
+    showMainApp();
+    fetchRecords();
+    subscribeRealtime();
+    startPolling();
+  }
+
+  function handleLogout() {
+    currentUser = null;
+    $("#login-id").value = "";
+    $("#login-pw").value = "";
+    $("#login-error").textContent = "";
+    showLoginScreen();
+  }
+
+  async function logOperation(action, target, detail) {
+    if (!supabaseReady || !currentUser) return;
+    try {
+      await sb.from("operation_logs").insert({
+        user_id: currentUser.id,
+        username: currentUser.username,
+        action,
+        target,
+        detail: detail || null
+      });
+    } catch (e) {
+      // ログ記録の失敗は業務操作自体を止めない
+    }
+  }
+
+  async function loadOperationLogs() {
+    const body = $("#logs-body");
+    const countEl = $("#logs-count");
+    if (!currentUser || currentUser.role !== "admin") {
+      body.innerHTML = `<div class="mus-empty">管理者のみ閲覧できます。</div>`;
+      countEl.textContent = "";
+      return;
+    }
+    body.innerHTML = `<div class="mus-loading">読み込み中...</div>`;
+    const { data, error } = await sb.rpc("get_operation_logs", {
+      p_login_id: currentUser.loginId,
+      p_password: currentUser.password
+    });
+    if (error) {
+      body.innerHTML = `<div class="mus-empty">ログの取得に失敗しました。</div>`;
+      countEl.textContent = "";
+      return;
+    }
+    const logs = data || [];
+    countEl.textContent = `${logs.length} 件`;
+    if (logs.length === 0) {
+      body.innerHTML = `<div class="mus-empty">操作ログはまだありません。</div>`;
+      return;
+    }
+    const actionClass = (a) => a === "登録" ? "a-insert" : (a === "削除" ? "a-delete" : "a-update");
+    body.innerHTML = `
+      <table class="mus-logtable">
+        <thead>
+          <tr><th>日時</th><th>ユーザー</th><th>操作</th><th>対象</th></tr>
+        </thead>
+        <tbody>
+          ${logs.map(l => `
+            <tr>
+              <td>${escapeHtml(new Date(l.occurred_at).toLocaleString("ja-JP"))}</td>
+              <td>${escapeHtml(l.username || "")}</td>
+              <td class="mus-log-action ${actionClass(l.action)}">${escapeHtml(l.action || "")}</td>
+              <td>${escapeHtml(l.target || "")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
   function rowToRecord(row) {
     return {
       id: row.id,
@@ -484,8 +692,10 @@
     renderList();
   }
 
+  let realtimeSubscribed = false;
   function subscribeRealtime() {
-    if (!supabaseReady) return;
+    if (!supabaseReady || realtimeSubscribed) return;
+    realtimeSubscribed = true;
     sb.channel("menu_usage_records_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, () => {
         fetchRecords();
@@ -498,9 +708,12 @@
       });
   }
 
+  let pollingStarted = false;
   function startPolling() {
+    if (pollingStarted) return;
+    pollingStarted = true;
     setInterval(() => {
-      if (supabaseReady) fetchRecords();
+      if (supabaseReady && currentUser) fetchRecords();
     }, 15000);
   }
 
@@ -516,6 +729,7 @@
       updateMenuDatalist();
       renderList();
       fetchRecords();
+      logOperation("登録", `${rec.menu || ""} / ${rec.material || ""}`, rec);
     }
   }
 
@@ -531,11 +745,13 @@
       updateMenuDatalist();
       renderList();
       fetchRecords();
+      logOperation("更新", `${rec.menu || ""} / ${rec.material || ""}`, { id, ...rec });
     }
   }
 
   async function deleteRecordDb(id) {
     if (!supabaseReady) { showSetupNotice(); return; }
+    const target = records.find(r => r.id === id);
     const { error } = await sb.from(TABLE).delete().eq("id", id);
     if (error) {
       showToast("削除に失敗しました: " + error.message);
@@ -545,6 +761,7 @@
       updateMenuDatalist();
       renderList();
       fetchRecords();
+      logOperation("削除", target ? `${target.menu || ""} / ${target.material || ""}` : id, { id });
     }
   }
 
@@ -801,11 +1018,14 @@
 
   wireMicButtons();
   resetForm();
-  if (initSupabase()) {
-    fetchRecords();
-    subscribeRealtime();
-    startPolling();
-  }
+  showLoginScreen();
+  initSupabase();
+
+  $("#btn-login").addEventListener("click", handleLogin);
+  $("#login-pw").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleLogin();
+  });
+  $("#btn-logout").addEventListener("click", handleLogout);
 })();
 </script>
 </body>
